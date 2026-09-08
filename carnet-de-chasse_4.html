@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Carnet de chasse</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1C2118">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Carnet de chasse">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root{
+    --bg: #1C2118;
+    --surface: #262B21;
+    --surface-2: #2F3527;
+    --moss: #454C39;
+    --moss-light: #5B634A;
+    --parchment: #EDE7D3;
+    --parchment-dim: #A8A894;
+    --orange: #E8590C;
+    --orange-dim: #B9490F;
+    --bark: #8A7048;
+    --radius: 10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--parchment);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap{max-width: 760px; margin: 0 auto; padding: 28px 20px 60px;}
+  header{display:flex; align-items:baseline; justify-content:space-between; margin-bottom: 22px; border-bottom: 1px solid var(--moss); padding-bottom: 18px;}
+  h1{
+    font-family: 'Fraunces', serif;
+    font-size: 30px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .tagline{font-size:13px; color:var(--parchment-dim); margin-top:4px;}
+  nav{display:flex; gap:6px; background:var(--surface); padding:4px; border-radius: var(--radius); margin-bottom:24px; border:1px solid var(--moss);}
+  nav button{
+    flex:1; padding:10px 14px; background:transparent; border:none; color:var(--parchment-dim);
+    font-family:'Inter',sans-serif; font-size:14px; font-weight:500; cursor:pointer; border-radius:7px;
+    transition: background .15s, color .15s;
+  }
+  nav button.active{background:var(--orange); color:#241005;}
+  section{display:none;}
+  section.active{display:block;}
+
+  .card{background:var(--surface); border:1px solid var(--moss); border-radius: var(--radius); padding:18px;}
+  .card + .card{margin-top:14px;}
+
+  label{display:block; font-size:12px; color:var(--parchment-dim); margin-bottom:5px; margin-top:12px;}
+  label:first-child{margin-top:0;}
+  input, select, textarea{
+    width:100%; background:var(--surface-2); border:1px solid var(--moss); color:var(--parchment);
+    padding:9px 10px; border-radius:7px; font-family:'Inter',sans-serif; font-size:14px;
+  }
+  input:focus, select:focus, textarea:focus{outline:none; border-color: var(--orange-dim);}
+  textarea{resize:vertical; min-height:50px;}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+
+  button.primary{
+    margin-top:16px; width:100%; padding:11px; background:var(--orange); color:#241005; border:none;
+    border-radius:7px; font-family:'Inter',sans-serif; font-weight:600; font-size:14px; cursor:pointer;
+    letter-spacing:0.01em;
+  }
+  button.primary:hover{background:#f5641a;}
+  button.ghost{
+    background:transparent; border:1px solid var(--moss-light); color:var(--parchment-dim);
+    padding:6px 10px; border-radius:6px; font-size:12px; cursor:pointer; font-family:'Inter',sans-serif;
+  }
+  button.ghost:hover{color:var(--parchment); border-color:var(--parchment-dim);}
+  button.ghost.active{background:var(--orange); color:#241005; border-color:var(--orange);}
+
+  .stats{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:18px;}
+  .stat{background:var(--surface); border:1px solid var(--moss); border-radius:var(--radius); padding:14px;}
+  .stat .num{font-family:'Fraunces',serif; font-size:26px; font-weight:600; color:var(--orange);}
+  .stat .lbl{font-size:11px; color:var(--parchment-dim); text-transform:uppercase; letter-spacing:0.04em; margin-top:2px;}
+
+  .entry{display:flex; gap:14px; align-items:flex-start;}
+  .seal{
+    flex-shrink:0; width:44px; height:44px; border-radius:50%; background:var(--surface-2);
+    border:1.5px solid var(--orange-dim); display:flex; align-items:center; justify-content:center;
+    font-family:'Fraunces',serif; font-weight:600; font-size:15px; color:var(--orange);
+  }
+  .entry-body{flex:1; min-width:0;}
+  .entry-top{display:flex; justify-content:space-between; align-items:baseline; gap:8px;}
+  .entry-species{font-family:'Fraunces',serif; font-size:17px; font-weight:600;}
+  .entry-date{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--parchment-dim); white-space:nowrap;}
+  .entry-meta{font-size:12px; color:var(--parchment-dim); margin-top:2px;}
+  .entry-notes{font-size:13px; color:var(--parchment-dim); margin-top:6px; line-height:1.5;}
+  .entry-actions{margin-top:8px;}
+  .empty{color:var(--parchment-dim); font-size:13px; text-align:center; padding:30px 10px;}
+
+  /* carte */
+  .map-toolbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:10px;}
+  .map-toolbar p{font-size:12px; color:var(--parchment-dim); margin:0;}
+  #map{
+    width:100%; height:420px; background:var(--surface-2); border:1px solid var(--moss);
+    border-radius:var(--radius); cursor:crosshair;
+  }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip{background:var(--surface); color:var(--parchment);}
+  .leaflet-popup-content{font-family:'Inter',sans-serif; font-size:13px; margin:10px 12px;}
+  .leaflet-popup-content b{font-family:'Fraunces',serif; font-size:14px;}
+  .zone-pin{width:16px; height:16px; border-radius:50%; border:2px solid #1C2118; box-shadow:0 0 0 1px rgba(0,0,0,0.35);}
+  .zone-list{margin-top:14px; display:flex; flex-direction:column; gap:8px;}
+  .zone-item{display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--moss); border-radius:8px; padding:10px 12px;}
+  .zone-dot{width:12px; height:12px; border-radius:50%; flex-shrink:0;}
+  .zone-name{font-weight:500; font-size:14px; flex:1;}
+  .zone-note{font-size:12px; color:var(--parchment-dim);}
+
+  .modal-bg{position:absolute; inset:0; background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center; z-index:10; padding:20px;}
+  .modal{background:var(--surface); border:1px solid var(--moss-light); border-radius:var(--radius); padding:20px; width:100%; max-width:340px;}
+  .modal h3{font-family:'Fraunces',serif; margin:0 0 12px; font-size:17px;}
+  .modal-actions{display:flex; gap:8px; margin-top:16px;}
+  .modal-actions button{flex:1;}
+  .swatches{display:flex; gap:8px; margin-top:6px;}
+  .swatch{width:26px; height:26px; border-radius:50%; cursor:pointer; border:2px solid transparent;}
+  .swatch.selected{border-color:var(--parchment);}
+
+  ::-webkit-scrollbar{width:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--moss-light); border-radius:4px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Carnet de chasse</h1>
+      <div class="tagline">Sorties, prélèvements et zones</div>
+    </div>
+  </header>
+
+  <nav>
+    <button class="active" data-tab="carnet">Carnet</button>
+    <button data-tab="carte">Carte des zones</button>
+  </nav>
+
+  <section id="tab-carnet" class="active">
+    <div class="stats">
+      <div class="stat"><div class="num" id="statSorties">0</div><div class="lbl">Sorties</div></div>
+      <div class="stat"><div class="num" id="statPrises">0</div><div class="lbl">Prélèvements</div></div>
+      <div class="stat"><div class="num" id="statEspeces">0</div><div class="lbl">Espèces</div></div>
+    </div>
+
+    <div class="card">
+      <label>Date</label>
+      <input type="date" id="fDate">
+      <div class="row2">
+        <div>
+          <label>Espèce</label>
+          <input type="text" id="fSpecies" placeholder="Ex. Chevreuil, Sanglier, Faisan">
+        </div>
+        <div>
+          <label>Quantité prélevée</label>
+          <input type="number" id="fQty" min="0" value="0">
+        </div>
+      </div>
+      <label>Zone</label>
+      <select id="fZone"><option value="">Aucune zone enregistrée</option></select>
+      <label>Notes (conditions, observations...)</label>
+      <textarea id="fNotes" placeholder="Météo, indices, compagnons de chasse..."></textarea>
+      <label>Photo (optionnel)</label>
+      <input type="file" id="fPhoto" accept="image/*">
+      <div id="fPhotoPreviewWrap" style="display:none; margin-top:8px; position:relative; width:100px;">
+        <img id="fPhotoPreview" style="width:100px; height:100px; object-fit:cover; border-radius:7px; border:1px solid var(--moss); display:block;">
+        <button type="button" id="fPhotoRemove" class="ghost" style="position:absolute; top:4px; right:4px; padding:2px 7px; font-size:11px;">✕</button>
+      </div>
+      <button class="primary" id="addEntryBtn">Ajouter au carnet</button>
+    </div>
+
+    <div id="entryList" style="margin-top:16px; display:flex; flex-direction:column; gap:10px;"></div>
+  </section>
+
+  <section id="tab-carte">
+    <div class="card">
+      <div class="map-toolbar">
+        <p id="mapHint">Clique sur la carte pour ajouter une zone.</p>
+        <div style="display:flex; gap:8px;">
+          <button class="ghost" id="locateBtn">Me localiser</button>
+          <button class="ghost" id="drawReserveBtn">Tracer la réserve</button>
+          <button class="ghost" id="clearMapHint">Effacer les repères</button>
+        </div>
+      </div>
+      <div id="map"></div>
+      <p style="font-size:11px; color:var(--parchment-dim); margin:10px 0 0;">Le contour affiché est la limite officielle de la commune des Déserts (source data.gouv.fr) — le territoire de l'ACCA correspond légalement au territoire communal, hors terrains exclus (habitations, terrains clos). Le tracé précis de la réserve de chasse (entre la D913 et la D206A) n'est pas publié en donnée ouverte : utilise "Tracer la réserve" pour la dessiner toi-même sur la carte.</p>
+      <div class="zone-list" id="zoneList"></div>
+      <div class="zone-list" id="reserveList"></div>
+    </div>
+  </section>
+</div>
+
+<div id="modalRoot"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+let entries = [];
+let zones = [];
+let reserves = [];
+const ZONE_COLORS = ['#E8590C','#8A7048','#5B634A','#B9490F','#D4A24C','#6B7A4A'];
+
+function showToast(msg, isError){
+  let t = document.getElementById('toast');
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.style.cssText = 'position:fixed; bottom:18px; left:50%; transform:translateX(-50%); padding:10px 16px; border-radius:8px; font-size:13px; z-index:999; max-width:88%; text-align:center; font-family:Inter,sans-serif;';
+    document.body.appendChild(t);
+  }
+  t.style.background = isError ? '#5A2323' : '#2F3527';
+  t.style.color = isError ? '#F3D6D6' : '#EDE7D3';
+  t.style.border = '1px solid ' + (isError ? '#8A3A3A' : '#454C39');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(()=>{ t.style.display='none'; }, isError ? 5000 : 2200);
+}
+
+if(typeof window.storage === 'undefined'){
+  console.warn('window.storage indisponible — utilisation de localStorage en secours.');
+}
+
+async function dbGet(key){
+  try{
+    if(window.storage){
+      const r = await window.storage.get(key, false);
+      if(r && typeof r.value === 'string') return r.value;
+    }
+  }catch(e){ /* pas disponible dans ce contexte, on bascule sur localStorage */ }
+  try{ return localStorage.getItem('carnet-chasse:'+key); }catch(e){ return null; }
+}
+
+async function dbSet(key, value){
+  let ok = false;
+  try{
+    if(window.storage){
+      const r = await window.storage.set(key, value, false);
+      if(r) ok = true;
+    }
+  }catch(e){ /* pas disponible dans ce contexte, on bascule sur localStorage */ }
+  try{ localStorage.setItem('carnet-chasse:'+key, value); ok = true; }catch(e){ /* stockage local aussi indisponible */ }
+  return ok;
+}
+
+async function loadData(){
+  try{ const v = await dbGet('entries'); entries = v ? JSON.parse(v) : []; }catch(e){ entries = []; }
+  try{ const v = await dbGet('zones'); zones = v ? JSON.parse(v) : []; }catch(e){ zones = []; }
+  try{ const v = await dbGet('reserves'); reserves = v ? JSON.parse(v) : []; }catch(e){ reserves = []; }
+  renderAll();
+}
+async function saveEntries(){
+  const ok = await dbSet('entries', JSON.stringify(entries));
+  if(!ok) showToast('La sauvegarde du carnet a échoué sur cet appareil.', true);
+}
+async function saveZones(){
+  const ok = await dbSet('zones', JSON.stringify(zones));
+  if(!ok) showToast('La sauvegarde des zones a échoué sur cet appareil.', true);
+}
+async function saveReserves(){
+  const ok = await dbSet('reserves', JSON.stringify(reserves));
+  if(!ok) showToast('La sauvegarde de la réserve a échoué sur cet appareil.', true);
+}
+
+function renderAll(){
+  renderStats();
+  renderEntries();
+  renderZoneSelect();
+  renderZoneList();
+  renderReserveList();
+}
+
+function renderStats(){
+  document.getElementById('statSorties').textContent = entries.length;
+  document.getElementById('statPrises').textContent = entries.reduce((s,e)=>s+(Number(e.qty)||0),0);
+  document.getElementById('statEspeces').textContent = new Set(entries.map(e=>e.species.toLowerCase()).filter(Boolean)).size;
+}
+
+function renderEntries(){
+  const list = document.getElementById('entryList');
+  if(entries.length === 0){
+    list.innerHTML = '<div class="empty">Aucune sortie enregistrée. Ajoute ta première entrée ci-dessus.</div>';
+    return;
+  }
+  const sorted = [...entries].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  list.innerHTML = sorted.map(e=>{
+    const initials = (e.species||'?').trim().slice(0,2).toUpperCase();
+    const dateFmt = e.date ? new Date(e.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}) : '';
+    const zoneName = zones.find(z=>z.id===e.zoneId)?.name;
+    const thumb = e.photo
+      ? `<img src="${e.photo}" onclick="openLightbox('${e.id}')" style="flex-shrink:0; width:44px; height:44px; object-fit:cover; border-radius:8px; border:1.5px solid var(--orange-dim); cursor:pointer;">`
+      : `<div class="seal">${initials}</div>`;
+    return `<div class="card entry" data-id="${e.id}">
+      ${thumb}
+      <div class="entry-body">
+        <div class="entry-top">
+          <div class="entry-species">${escapeHtml(e.species||'Sans espèce')}</div>
+          <div class="entry-date">${dateFmt}</div>
+        </div>
+        <div class="entry-meta">${e.qty>0 ? e.qty+' prélevé(s)' : 'Aucun prélèvement'}${zoneName ? ' · '+escapeHtml(zoneName) : ''}</div>
+        ${e.notes ? `<div class="entry-notes">${escapeHtml(e.notes)}</div>` : ''}
+        <div class="entry-actions"><button class="ghost" onclick="deleteEntry('${e.id}')">Supprimer</button></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.openLightbox = function(id){
+  const e = entries.find(en=>en.id===id);
+  if(!e || !e.photo) return;
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `<div class="modal-bg" id="lightboxBg">
+    <img src="${e.photo}" style="max-width:100%; max-height:80vh; border-radius:10px; display:block;">
+  </div>`;
+  document.getElementById('lightboxBg').addEventListener('click', ()=>{ root.innerHTML=''; });
+};
+
+function renderZoneSelect(){
+  const sel = document.getElementById('fZone');
+  sel.innerHTML = '<option value="">Aucune zone</option>' + zones.map(z=>`<option value="${z.id}">${escapeHtml(z.name)}</option>`).join('');
+}
+
+function renderReserveList(){
+  const list = document.getElementById('reserveList');
+  if(reserves.length === 0){ list.innerHTML=''; return; }
+  list.innerHTML = reserves.map(r=>`<div class="zone-item">
+      <div class="zone-dot" style="background:#E24B4A"></div>
+      <div class="zone-name">${escapeHtml(r.name)}</div>
+      <div class="zone-note">Réserve de chasse</div>
+      <button class="ghost" onclick="deleteReserve('${r.id}')">Retirer</button>
+    </div>`).join('');
+}
+
+window.deleteReserve = async function(id){
+  reserves = reserves.filter(r=>r.id!==id);
+  await saveReserves();
+  renderReserveList(); plotZones();
+};
+
+function renderZoneList(){
+  const list = document.getElementById('zoneList');
+  if(zones.length === 0){
+    list.innerHTML = '<div class="empty">Aucune zone ajoutée pour l’instant.</div>';
+    return;
+  }
+  list.innerHTML = zones.map(z=>`<div class="zone-item">
+      <div class="zone-dot" style="background:${z.color}"></div>
+      <div class="zone-name">${escapeHtml(z.name)}</div>
+      <div class="zone-note">${escapeHtml(z.note||'')}</div>
+      <button class="ghost" onclick="deleteZone('${z.id}')">Retirer</button>
+    </div>`).join('');
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+// photo : lecture + redimensionnement/compression avant stockage
+let pendingPhoto = null;
+const fPhotoInput = document.getElementById('fPhoto');
+const fPhotoPreviewWrap = document.getElementById('fPhotoPreviewWrap');
+const fPhotoPreview = document.getElementById('fPhotoPreview');
+
+fPhotoInput.addEventListener('change', ()=>{
+  const file = fPhotoInput.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const maxDim = 900;
+      let w = img.width, h = img.height;
+      if(w > h && w > maxDim){ h = Math.round(h*maxDim/w); w = maxDim; }
+      else if(h > maxDim){ w = Math.round(w*maxDim/h); h = maxDim; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      pendingPhoto = canvas.toDataURL('image/jpeg', 0.72);
+      fPhotoPreview.src = pendingPhoto;
+      fPhotoPreviewWrap.style.display = 'block';
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('fPhotoRemove').addEventListener('click', ()=>{
+  pendingPhoto = null;
+  fPhotoInput.value = '';
+  fPhotoPreviewWrap.style.display = 'none';
+});
+
+document.getElementById('addEntryBtn').addEventListener('click', async ()=>{
+  const date = document.getElementById('fDate').value;
+  const species = document.getElementById('fSpecies').value.trim();
+  const qty = Number(document.getElementById('fQty').value)||0;
+  const zoneId = document.getElementById('fZone').value;
+  const notes = document.getElementById('fNotes').value.trim();
+  if(!date || !species){ return; }
+  entries.push({id:uid(), date, species, qty, zoneId, notes, photo: pendingPhoto});
+  await saveEntries();
+  document.getElementById('fSpecies').value='';
+  document.getElementById('fQty').value='0';
+  document.getElementById('fNotes').value='';
+  pendingPhoto = null;
+  fPhotoInput.value = '';
+  fPhotoPreviewWrap.style.display = 'none';
+  renderStats(); renderEntries();
+});
+
+window.deleteEntry = async function(id){
+  entries = entries.filter(e=>e.id!==id);
+  await saveEntries();
+  renderStats(); renderEntries();
+};
+
+window.deleteZone = async function(id){
+  zones = zones.filter(z=>z.id!==id);
+  await saveZones();
+  renderZoneSelect(); renderZoneList(); plotZones();
+};
+
+document.getElementById('clearMapHint').addEventListener('click', async ()=>{
+  if(zones.length===0) return;
+  zones = [];
+  await saveZones();
+  renderZoneSelect(); renderZoneList(); plotZones();
+});
+
+// tabs
+document.querySelectorAll('nav button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('section').forEach(s=>s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+    if(btn.dataset.tab==='carte') setTimeout(()=>{ map.invalidateSize(); }, 30);
+  });
+});
+
+// map (OpenStreetMap via Leaflet) — centré sur le chef-lieu des Déserts (D913 / D206A)
+const map = L.map('map', {zoomControl:true}).setView([45.621, 6.009], 14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 18,
+  attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+const zoneLayer = L.layerGroup().addTo(map);
+
+// Limite officielle de la commune des Déserts (73098) — API publique data.gouv.fr
+fetch('https://geo.api.gouv.fr/communes/73098?fields=nom,contour&format=geojson&geometry=contour')
+  .then(r => r.json())
+  .then(geojson => {
+    L.geoJSON(geojson, {
+      style: { color:'#E8590C', weight:2, fill:true, fillColor:'#E8590C', fillOpacity:0.06, dashArray:'6 4' }
+    }).addTo(map).bindTooltip('Commune des Déserts (territoire ACCA, hors exclusions)', {sticky:true});
+  })
+  .catch(()=>{});
+
+function pinIcon(color){
+  return L.divIcon({
+    className: '',
+    html: `<div class="zone-pin" style="background:${color}"></div>`,
+    iconSize: [16,16],
+    iconAnchor: [8,8]
+  });
+}
+
+function plotZones(){
+  zoneLayer.clearLayers();
+  zones.forEach(z=>{
+    if(typeof z.lat !== 'number' || typeof z.lng !== 'number') return;
+    const marker = L.marker([z.lat, z.lng], {icon: pinIcon(z.color)});
+    marker.bindPopup(`<b>${escapeHtml(z.name)}</b>${z.note ? '<br>'+escapeHtml(z.note) : ''}`);
+    marker.addTo(zoneLayer);
+  });
+  reserves.forEach(r=>{
+    if(!Array.isArray(r.points) || r.points.length < 3) return;
+    const poly = L.polygon(r.points, {color:'#E24B4A', weight:2, fillColor:'#E24B4A', fillOpacity:0.18});
+    poly.bindTooltip(escapeHtml(r.name), {sticky:true});
+    poly.addTo(zoneLayer);
+  });
+}
+
+// mode normal : clic = nouvelle zone. mode traçage : clic = point de la réserve
+let drawMode = false;
+let drawPoints = [];
+let drawLayer = null;
+const drawBtn = document.getElementById('drawReserveBtn');
+const mapHint = document.getElementById('mapHint');
+
+map.on('click', (e)=>{
+  if(drawMode){ addDrawPoint(e.latlng); return; }
+  openZoneModal(e.latlng.lat, e.latlng.lng);
+});
+
+function addDrawPoint(latlng){
+  drawPoints.push(latlng);
+  if(drawLayer) map.removeLayer(drawLayer);
+  drawLayer = L.polyline(drawPoints, {color:'#E24B4A', weight:2, dashArray:'6 4'}).addTo(map);
+  updateDrawHint();
+}
+
+function updateDrawHint(){
+  const n = drawPoints.length;
+  if(n < 3){
+    mapHint.textContent = `Clique pour poser chaque point de la réserve (${n} point${n>1?'s':''}, 3 minimum).`;
+  } else {
+    mapHint.textContent = `${n} points posés — clique sur "Terminer le tracé" quand la réserve est complète.`;
+  }
+}
+
+function setDrawMode(on){
+  drawMode = on;
+  drawBtn.classList.toggle('active', on);
+  drawBtn.textContent = on ? 'Terminer le tracé' : 'Tracer la réserve';
+  if(on){
+    drawPoints = [];
+    if(drawLayer){ map.removeLayer(drawLayer); drawLayer = null; }
+    updateDrawHint();
+  } else {
+    mapHint.textContent = 'Clique sur la carte pour ajouter une zone.';
+  }
+}
+
+drawBtn.addEventListener('click', ()=>{
+  if(!drawMode){
+    setDrawMode(true);
+    return;
+  }
+  // le mode traçage est actif : ce clic termine (ou annule si pas assez de points)
+  if(drawPoints.length >= 3){
+    finishReserveDraw();
+  } else {
+    if(drawLayer){ map.removeLayer(drawLayer); drawLayer = null; }
+    drawPoints = [];
+    drawMode = false;
+    drawBtn.classList.remove('active');
+    drawBtn.textContent = 'Tracer la réserve';
+    mapHint.textContent = 'Clique sur la carte pour ajouter une zone.';
+  }
+});
+
+function finishReserveDraw(){
+  const pts = drawPoints.map(p=>[p.lat, p.lng]);
+  if(drawLayer){ map.removeLayer(drawLayer); drawLayer = null; }
+  drawPoints = [];
+  drawMode = false;
+  drawBtn.classList.remove('active');
+  drawBtn.textContent = 'Tracer la réserve';
+  mapHint.textContent = 'Clique sur la carte pour ajouter une zone.';
+  openReserveNameModal(pts);
+}
+
+function openReserveNameModal(points){
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `<div class="modal-bg">
+    <div class="modal">
+      <h3>Nommer la réserve</h3>
+      <label>Nom</label>
+      <input type="text" id="mReserveName" placeholder="Ex. Réserve D913 / D206A" value="Réserve D913 / D206A">
+      <div class="modal-actions">
+        <button class="ghost" id="mReserveCancel">Annuler</button>
+        <button class="primary" id="mReserveSave" style="margin-top:0;">Enregistrer</button>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('mReserveCancel').addEventListener('click', ()=>{ root.innerHTML=''; });
+  document.getElementById('mReserveSave').addEventListener('click', async ()=>{
+    const name = document.getElementById('mReserveName').value.trim() || 'Réserve de chasse';
+    reserves.push({id:uid(), name, points});
+    await saveReserves();
+    root.innerHTML = '';
+    renderReserveList(); plotZones();
+  });
+}
+
+document.getElementById('locateBtn').addEventListener('click', ()=>{
+  if(!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    pos => map.setView([pos.coords.latitude, pos.coords.longitude], 13),
+    () => {}
+  );
+});
+
+function openZoneModal(lat,lng){
+  const root = document.getElementById('modalRoot');
+  let selectedColor = ZONE_COLORS[zones.length % ZONE_COLORS.length];
+  root.innerHTML = `<div class="modal-bg">
+    <div class="modal">
+      <h3>Nouvelle zone</h3>
+      <label>Nom de la zone</label>
+      <input type="text" id="mZoneName" placeholder="Ex. Bois du Moulin">
+      <label>Note (optionnel)</label>
+      <input type="text" id="mZoneNote" placeholder="Ex. Bordure de champ, coin humide">
+      <label>Couleur</label>
+      <div class="swatches" id="mSwatches">
+        ${ZONE_COLORS.map(c=>`<div class="swatch" data-color="${c}" style="background:${c}"></div>`).join('')}
+      </div>
+      <div class="modal-actions">
+        <button class="ghost" id="mCancel">Annuler</button>
+        <button class="primary" id="mSave" style="margin-top:0;">Ajouter la zone</button>
+      </div>
+    </div>
+  </div>`;
+  const swatches = root.querySelectorAll('.swatch');
+  swatches.forEach(s=>{
+    if(s.dataset.color===selectedColor) s.classList.add('selected');
+    s.addEventListener('click', ()=>{
+      selectedColor = s.dataset.color;
+      swatches.forEach(sw=>sw.classList.remove('selected'));
+      s.classList.add('selected');
+    });
+  });
+  document.getElementById('mCancel').addEventListener('click', ()=>{ root.innerHTML=''; });
+  document.getElementById('mSave').addEventListener('click', async ()=>{
+    const name = document.getElementById('mZoneName').value.trim();
+    if(!name) return;
+    const note = document.getElementById('mZoneNote').value.trim();
+    zones.push({id:uid(), name, note, color:selectedColor, lat, lng});
+    await saveZones();
+    root.innerHTML = '';
+    renderZoneSelect(); renderZoneList(); plotZones();
+  });
+}
+
+document.getElementById('fDate').valueAsDate = new Date();
+
+loadData().then(()=>{ plotZones(); });
+
+// Service worker : active le mode hors-ligne quand le fichier est servi via http(s)
+// (sans effet, sans erreur bloquante, si ouvert en local via file://)
+if('serviceWorker' in navigator && (location.protocol === 'https:' || location.protocol === 'http:')){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
