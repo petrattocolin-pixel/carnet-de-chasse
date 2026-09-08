@@ -142,6 +142,20 @@
     </div>
   </header>
 
+  <div class="card" id="syncCard" style="margin-bottom:18px; padding:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+      <div>
+        <div style="font-size:13px; font-weight:500;">Synchronisation entre appareils</div>
+        <div id="syncStatus" style="font-size:11px; color:var(--parchment-dim); margin-top:2px;">Non connecté</div>
+      </div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <input type="text" id="syncCodeInput" placeholder="Coller un code" style="width:150px; font-family:'JetBrains Mono',monospace; font-size:13px; padding:7px 9px;">
+        <button class="ghost" id="syncUseBtn">Utiliser ce code</button>
+        <button class="ghost" id="syncGenBtn">Générer un code</button>
+      </div>
+    </div>
+  </div>
+
   <nav>
     <button class="active" data-tab="carnet">Carnet</button>
     <button data-tab="carte">Carte des zones</button>
@@ -203,8 +217,25 @@
 
 <div id="modalRoot"></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBN6T418sPi8zX3sjaai2gqF-Y7sssHbyY",
+  authDomain: "carnet-de-chasse-b1e6e.firebaseapp.com",
+  projectId: "carnet-de-chasse-b1e6e",
+  storageBucket: "carnet-de-chasse-b1e6e.firebasestorage.app",
+  messagingSenderId: "509222157752",
+  appId: "1:509222157752:web:f251d371898f7808eea34d",
+  measurementId: "G-KLNWC4FFZM"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+let syncCode = localStorage.getItem('carnet-chasse:syncCode') || null;
+let syncDocRef = null;
+let syncUnsub = null;
+
 let entries = [];
 let zones = [];
 let reserves = [];
@@ -262,15 +293,78 @@ async function loadData(){
 async function saveEntries(){
   const ok = await dbSet('entries', JSON.stringify(entries));
   if(!ok) showToast('La sauvegarde du carnet a échoué sur cet appareil.', true);
+  pushCloud();
 }
 async function saveZones(){
   const ok = await dbSet('zones', JSON.stringify(zones));
   if(!ok) showToast('La sauvegarde des zones a échoué sur cet appareil.', true);
+  pushCloud();
 }
 async function saveReserves(){
   const ok = await dbSet('reserves', JSON.stringify(reserves));
   if(!ok) showToast('La sauvegarde de la réserve a échoué sur cet appareil.', true);
+  pushCloud();
 }
+
+// --- Synchronisation Firestore (facultative, activée via un code partagé) ---
+const syncStatusEl = document.getElementById('syncStatus');
+const syncCodeInput = document.getElementById('syncCodeInput');
+
+function genSyncCode(){
+  const seg = () => Math.random().toString(36).slice(2,6).toUpperCase();
+  return seg()+'-'+seg()+'-'+seg();
+}
+
+function connectSync(code, pushInitial){
+  if(syncUnsub){ syncUnsub(); syncUnsub = null; }
+  syncCode = code;
+  localStorage.setItem('carnet-chasse:syncCode', code);
+  syncCodeInput.value = code;
+  syncDocRef = db.collection('carnets').doc(code);
+  syncStatusEl.textContent = 'Connexion...';
+  syncUnsub = syncDocRef.onSnapshot((snap)=>{
+    if(snap.metadata.hasPendingWrites) return; // c'est notre propre écriture, on l'ignore
+    syncStatusEl.textContent = 'Synchronisé — code : ' + code;
+    const data = snap.data();
+    if(!data) return;
+    entries = data.entries || [];
+    zones = data.zones || [];
+    reserves = data.reserves || [];
+    try{
+      localStorage.setItem('carnet-chasse:entries', JSON.stringify(entries));
+      localStorage.setItem('carnet-chasse:zones', JSON.stringify(zones));
+      localStorage.setItem('carnet-chasse:reserves', JSON.stringify(reserves));
+    }catch(e){}
+    renderAll();
+    plotZones();
+  }, (err)=>{
+    console.error('sync error', err);
+    syncStatusEl.textContent = 'Erreur de synchronisation';
+    showToast('Synchronisation impossible : ' + (err && err.message ? err.message : err), true);
+  });
+  // Ne pousse les données locales que pour un nouveau code (rien à écraser côté cloud).
+  // En rejoignant un code existant, on laisse d'abord arriver les données distantes.
+  if(pushInitial) pushCloud();
+}
+
+async function pushCloud(){
+  if(!syncDocRef) return;
+  try{
+    await syncDocRef.set({ entries, zones, reserves, updatedAt: Date.now() });
+  }catch(e){
+    console.error('pushCloud failed', e);
+    showToast('Synchronisation impossible : ' + (e && e.message ? e.message : e), true);
+  }
+}
+
+document.getElementById('syncGenBtn').addEventListener('click', ()=>{
+  connectSync(genSyncCode(), true);
+});
+document.getElementById('syncUseBtn').addEventListener('click', ()=>{
+  const code = syncCodeInput.value.trim().toUpperCase();
+  if(!code) return;
+  connectSync(code, false);
+});
 
 function renderAll(){
   renderStats();
@@ -638,7 +732,10 @@ function openZoneModal(lat,lng){
 
 document.getElementById('fDate').valueAsDate = new Date();
 
-loadData().then(()=>{ plotZones(); });
+loadData().then(()=>{
+  plotZones();
+  if(syncCode){ syncCodeInput.value = syncCode; connectSync(syncCode, false); }
+});
 
 // Service worker : active le mode hors-ligne quand le fichier est servi via http(s)
 // (sans effet, sans erreur bloquante, si ouvert en local via file://)
