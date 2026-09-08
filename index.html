@@ -288,6 +288,12 @@ async function loadData(){
   try{ const v = await dbGet('entries'); entries = v ? JSON.parse(v) : []; }catch(e){ entries = []; }
   try{ const v = await dbGet('zones'); zones = v ? JSON.parse(v) : []; }catch(e){ zones = []; }
   try{ const v = await dbGet('reserves'); reserves = v ? JSON.parse(v) : []; }catch(e){ reserves = []; }
+  // normalise les anciens points [lat,lng] vers {lat,lng} (Firestore n'accepte pas les tableaux imbriqués)
+  reserves.forEach(r=>{
+    if(Array.isArray(r.points)){
+      r.points = r.points.map(p => (p && p.lat !== undefined) ? p : { lat: p[0], lng: p[1] });
+    }
+  });
   renderAll();
 }
 async function saveEntries(){
@@ -648,7 +654,7 @@ drawBtn.addEventListener('click', ()=>{
 });
 
 function finishReserveDraw(){
-  const pts = drawPoints.map(p=>[p.lat, p.lng]);
+  const pts = drawPoints.map(p=>({lat:p.lat, lng:p.lng}));
   if(drawLayer){ map.removeLayer(drawLayer); drawLayer = null; }
   drawPoints = [];
   drawMode = false;
